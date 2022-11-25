@@ -6,9 +6,28 @@ import java.util.Random;
 public class Main {
     public static final Map<Integer, Integer> sizeToFreq = new HashMap<>();
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
+
+        Thread thread = new Thread(() -> {
+            while (!Thread.interrupted()) {
+                synchronized (sizeToFreq) {
+                    try {
+                        sizeToFreq.wait();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    Map.Entry<Integer, Integer> maxEntry = sizeToFreq.entrySet().stream()
+                            .max(Comparator.comparing(Map.Entry::getValue))
+                            .orElse(null);
+
+                    System.out.println("Текущий максимум: " + maxEntry.getKey() + " (встретилось " + maxEntry.getValue() + " раз)");
+                }
+            }
+        });
+        thread.start();
+
         for (int i = 0; i < 1000; i++) {
-            new Thread(() -> {
+            Thread thread1 = new Thread(() -> {
                 int countR = 0;
                 String route = generateRoute("RLRFR", 100);
                 for (int j = 0; j < route.length(); j++) {
@@ -22,9 +41,14 @@ public class Main {
                     } else {
                         sizeToFreq.put(countR, 1);
                     }
+                    sizeToFreq.notify();
                 }
-            }).start();
+            });
+            thread1.start();
+            thread1.join();
         }
+        thread.interrupt();
+
         printMap(sizeToFreq);
     }
 
