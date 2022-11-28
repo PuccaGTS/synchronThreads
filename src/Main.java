@@ -1,55 +1,44 @@
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class Main {
     public static final Map<Integer, Integer> sizeToFreq = new HashMap<>();
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
+        String [] texts = new String[1000];
+        for (int i = 0; i < texts.length; i++) {
+            texts[i] = generateRoute("RLRFR", 100);
+        }
+        List<Future<Integer>> futures = new ArrayList<>();
+        ExecutorService threadPool = Executors.newFixedThreadPool(texts.length);
 
-        Thread thread = new Thread(() -> {
-            while (!Thread.interrupted()) {
-                synchronized (sizeToFreq) {
-                    try {
-                        sizeToFreq.wait();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    Map.Entry<Integer, Integer> maxEntry = sizeToFreq.entrySet().stream()
-                            .max(Comparator.comparing(Map.Entry::getValue))
-                            .orElse(null);
-
-                    System.out.println("Текущий максимум: " + maxEntry.getKey() + " (встретилось " + maxEntry.getValue() + " раз)");
-                }
-            }
-        });
-        thread.start();
-
-        for (int i = 0; i < 1000; i++) {
-            Thread thread1 = new Thread(() -> {
+        for(String text : texts) {
+            Future<Integer> futureTask = threadPool.submit(() -> {
                 int countR = 0;
-                String route = generateRoute("RLRFR", 100);
-                for (int j = 0; j < route.length(); j++) {
-                    if (route.charAt(j) == 'R') {
+                for (int j = 0; j< text.length(); j++) {
+                    if (text.charAt(j) == 'R') {
                         countR++;
                     }
                 }
-                synchronized (sizeToFreq) {
-                    if (sizeToFreq.containsKey(countR)) {
-                        sizeToFreq.put(countR, sizeToFreq.get(countR) + 1);
-                    } else {
-                        sizeToFreq.put(countR, 1);
-                    }
-                    sizeToFreq.notify();
-                }
+                return countR;
             });
-            thread1.start();
-            thread1.join();
+            futures.add(futureTask);
         }
-        thread.interrupt();
-
+        for (Future<Integer> future : futures) {
+            int numder = future.get();
+            synchronized (sizeToFreq) {
+                if (sizeToFreq.containsKey(numder)) {
+                    sizeToFreq.put(numder, sizeToFreq.get(numder) + 1);
+                } else {
+                    sizeToFreq.put(numder, 1);
+                }
+            }
+        }
         printMap(sizeToFreq);
+        threadPool.shutdown();
     }
 
     public static String generateRoute(String letters, int length) {
